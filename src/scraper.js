@@ -10,6 +10,7 @@ export class ArgenpropScraper {
   constructor(baseUrl) {
     this.baseUrl = baseUrl;
     this.listingsFile = join(__dirname, '../data/listings.json');
+    this.pageNumber = 1;
   }
 
   async initialize() {
@@ -27,6 +28,7 @@ export class ArgenpropScraper {
   async scrapeListings(url) {
     const page = await this.browser.newPage();
     const allListings = [];
+    console.log(`Scanning: ${this.baseUrl} - Page ${this.pageNumber}`);
 
     try {
       await page.goto(url, { waitUntil: 'networkidle' });
@@ -40,9 +42,38 @@ export class ArgenpropScraper {
           const card = listing.locator('.card').first();
           const cardLink = await card.getAttribute('href');
           
-          // Get image
-          const imgElement = listing.locator('ul.card__photos li img').first();
-          const imgSrc = await imgElement.getAttribute('src');
+          // Get image - try multiple selectors
+          let imgSrc = null;
+          const selectors = [
+            'ul.card__photos li img',
+            '.card__photos img',
+            'img.card__photo',
+            '.card_photo img',
+            'picture img',
+            '[data-src]'
+          ];
+          
+          for (const selector of selectors) {
+            const imgElement = listing.locator(selector).first();
+            if (await imgElement.count() > 0) {
+              // Try src attribute first
+              imgSrc = await imgElement.getAttribute('src');
+              
+              // If src is empty, try data-src
+              if (!imgSrc) {
+                imgSrc = await imgElement.getAttribute('data-src');
+              }
+              
+              // If still empty, try data-lazy
+              if (!imgSrc) {
+                imgSrc = await imgElement.getAttribute('data-lazy');
+              }
+              
+              if (imgSrc) {
+                break;
+              }
+            }
+          }
           
           // Get text content
           const price = await listing.locator('.card__price').first().textContent();
@@ -88,7 +119,7 @@ export class ArgenpropScraper {
         const nextUrl = await nextPageButton.getAttribute('data-link-href');
         if (nextUrl) {
           const fullNextUrl = nextUrl.startsWith('http') ? nextUrl : this.baseUrl + nextUrl;
-          console.log('Found next page, scraping:', fullNextUrl);
+          this.pageNumber++;
           const nextListings = await this.scrapeListings(fullNextUrl);
           allListings.push(...nextListings);
         }
@@ -125,40 +156,51 @@ export class ArgenpropScraper {
   }
 
   async scanForNewListings(url) {
-    console.log('Starting scan...');
-    const existingListings = this.loadExistingListings();
-    const isFirstRun = existingListings.length === 0;
+    this.pageNumber = 1; // Reset page counter
+    console.log(`Starting scan...`);
+    try {
+      const existingListings = this.loadExistingListings();
+      const isFirstRun = existingListings.length === 0;
+      
+      if (isFirstRun) {
+        console.log('First run detected. Loading initial listings without sending notifications...');
+      }
+      
+      const existingIds = new Set(existingListings.map(l => l.id));
+      
+      const scrapedListings = await this.scrapeListings(url);
+      
+      // Find new listings
+      let newListings = scrapedListings.filter(l => !existingIds.has(l.id));
+      
+      // On first run, don't send notifications for all initial listings
+      if (isFirstRun) {
+        newListings = [];
+      }
+      
+      // Merge and save all listings
+      const allListings = [...scrapedListings, ...existingListings.filter(existing => !scrapedListings.find(s => s.id === existing.id))];
+      this.saveListings(allListings);
+      
+      console.log(`Found ${scrapedListings.filter(l => !existingIds.has(l.id)).length} new listings out of ${scrapedListings.length} total listings`);
+      if (isFirstRun) {
+        console.log('Stored all listings. Ready to monitor for new ones.');
+      }
     
-    if (isFirstRun) {
-      console.log('First run detected. Loading initial listings without sending notifications...');
+      return {
+        newListings,
+        totalScraped: scrapedListings.length,
+        newCount: newListings.length,
+        isFirstRun,
+      };
+    } catch (error) {
+      console.error('Error scanning for new listings:', error.message);
+      return {
+        newListings: [],
+        totalScraped: 0,
+        newCount: 0,
+        isFirstRun: false,
+      };
     }
-    
-    const existingIds = new Set(existingListings.map(l => l.id));
-    
-    const scrapedListings = await this.scrapeListings(url);
-    
-    // Find new listings
-    let newListings = scrapedListings.filter(l => !existingIds.has(l.id));
-    
-    // On first run, don't send notifications for all initial listings
-    if (isFirstRun) {
-      newListings = [];
-    }
-    
-    // Merge and save all listings
-    const allListings = [...scrapedListings, ...existingListings.filter(existing => !scrapedListings.find(s => s.id === existing.id))];
-    this.saveListings(allListings);
-    
-    console.log(`Found ${scrapedListings.filter(l => !existingIds.has(l.id)).length} new listings out of ${scrapedListings.length} total listings`);
-    if (isFirstRun) {
-      console.log('Stored all listings. Ready to monitor for new ones.');
-    }
-    
-    return {
-      newListings,
-      totalScraped: scrapedListings.length,
-      newCount: newListings.length,
-      isFirstRun,
-    };
   }
 }

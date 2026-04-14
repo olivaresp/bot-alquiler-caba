@@ -9,10 +9,10 @@
     "dev": "node --watch main.js"
   },
   "dependencies": {
-    "playwright": "^1.40.0",
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",
-    "node-cron": "^3.0.2"
-  },
-  "devDependencies": {}
+    "form-data": "^4.0.5",
+    "node-cron": "^3.0.2",
+    "playwright": "^1.40.0"
+  }
 }

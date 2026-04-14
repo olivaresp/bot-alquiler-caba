@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import FormData from 'form-data';
+import { Readable } from 'stream';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,6 +42,38 @@ export class TelegramBot {
       return response.data;
     } catch (error) {
       console.error('Error sending photo:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async sendPhotoAsBase64(photoUrl, caption) {
+    try {
+      // Descargar la imagen
+      const imageResponse = await axios.get(photoUrl, {
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 10000
+      });
+
+      // Crear un stream desde el buffer
+      const stream = Readable.from(imageResponse.data);
+
+      // Crear FormData
+      const formData = new FormData();
+      formData.append('chat_id', this.chatId);
+      formData.append('photo', stream, 'photo.jpg');
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'HTML');
+
+      // Enviar foto
+      const response = await axios.post(`${this.apiUrl}/sendPhoto`, formData, {
+        headers: formData.getHeaders()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending photo as base64:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -104,9 +138,15 @@ export class TelegramBot {
         try {
           const caption = this.formatListingCaption(listing);
           
-          // If listing has image, send photo, otherwise send message
+          // If listing has image, send photo in base64, otherwise send message
           if (listing.image) {
-            await this.sendPhotoWithButton(listing.image, caption);
+            try {
+              await this.sendPhotoAsBase64(listing.image, caption);
+            } catch (imageError) {
+              // Si falla enviar imagen, enviar como texto
+              console.error(`Failed to send image for listing ${listing.id}, sending as text instead`);
+              await this.sendMessage(caption);
+            }
           } else {
             await this.sendMessage(caption);
           }

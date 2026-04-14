@@ -7,11 +7,7 @@ export class Scheduler {
     this.task = null;
   }
 
-  start() {
-    // Convert milliseconds to cron expression (runs every X milliseconds)
-    // Since cron doesn't support millisecond intervals, we'll use a simple setInterval
-    console.log(`Starting scheduler: runs every ${this.intervalMs / 1000} seconds`);
-    
+  start() {    
     // Run immediately
     this.runTask();
     

@@ -27,9 +27,9 @@ async function main() {
       process.exit(1);
     }
 
-    console.log('Initializing Argenprop Scraper...');
-    console.log(`Base URL: ${BASE_URL}`);
+    console.log('Initializing: BOT | Alquileres CABA');
     console.log(`Scan Interval: ${SCAN_INTERVAL / 1000} seconds`);
+    console.log('');
 
     // Initialize scraper
     scraper = new ArgenpropScraper(BASE_URL);
