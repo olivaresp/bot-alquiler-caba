@@ -8,6 +8,7 @@ dotenv.config();
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_MONITOR_CHAT_ID = process.env.TELEGRAM_MONITOR_CHAT_ID || TELEGRAM_CHAT_ID;
 const SCAN_INTERVAL = parseInt(process.env.SCAN_INTERVAL || '600000', 10); // 10 minutes by default
 const BASE_URL = process.env.BASE_URL || 'https://www.argenprop.com';
 
@@ -16,6 +17,7 @@ const SCRAPE_URL = 'https://www.argenprop.com/departamentos/alquiler/almagro-o-c
 
 let scraper;
 let telegramBot;
+let monitorBot;
 let scheduler;
 
 async function main() {
@@ -27,7 +29,7 @@ async function main() {
       process.exit(1);
     }
 
-    console.log('Initializing: BOT | Alquileres CABA');
+    console.log('Initializing: BOT | Alquiler CABA');
     console.log(`Scan Interval: ${SCAN_INTERVAL / 1000} seconds`);
     console.log('');
 
@@ -37,6 +39,10 @@ async function main() {
 
     // Initialize Telegram bot
     telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID);
+    
+    // Initialize Monitor bot for status messages
+    monitorBot = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_MONITOR_CHAT_ID);
+    scraper.setMonitorBot(monitorBot);
 
     // Create scheduler callback
     const scanCallback = async () => {
@@ -57,9 +63,9 @@ async function main() {
       } catch (error) {
         console.error('Error during scan:', error.message);
         
-        // Notify about error
+        // Send error to monitor chat
         try {
-          await telegramBot.sendMessage(`❌ Error during scan: ${error.message}`);
+          await monitorBot.sendMessage(`BOT | Alquiler CABA 🔴 - ${error.message}`);
         } catch (notifyError) {
           console.error('Could not send error notification:', notifyError.message);
         }
@@ -69,10 +75,25 @@ async function main() {
     // Initialize and start scheduler
     scheduler = new Scheduler(SCAN_INTERVAL, scanCallback);
     scheduler.start();
+    
+    // Send startup message
+    try {
+      await monitorBot.sendMessage(`BOT | Alquiler CABA 🟢`);
+    } catch (error) {
+      console.error('Could not send startup message:', error.message);
+    }
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
       console.log('\nShutting down gracefully...');
+      
+      // Send shutdown message
+      try {
+        await monitorBot.sendMessage(`BOT | Alquiler CABA 🔴`);
+      } catch (error) {
+        console.error('Could not send shutdown message:', error.message);
+      }
+      
       if (scheduler) scheduler.stop();
       if (scraper) await scraper.close();
       process.exit(0);
@@ -81,6 +102,16 @@ async function main() {
     console.log('Scraper is running. Press Ctrl+C to stop.');
   } catch (error) {
     console.error('Fatal error:', error.message);
+    
+    // Try to send error message to monitor
+    try {
+      if (monitorBot) {
+        await monitorBot.sendMessage(`BOT | Alquiler CABA 🔴 - ${error.message}`);
+      }
+    } catch (notifyError) {
+      console.error('Could not send error notification:', notifyError.message);
+    }
+    
     process.exit(1);
   }
 }

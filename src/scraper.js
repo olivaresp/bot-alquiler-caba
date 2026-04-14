@@ -11,6 +11,11 @@ export class ArgenpropScraper {
     this.baseUrl = baseUrl;
     this.listingsFile = join(__dirname, '../data/listings.json');
     this.pageNumber = 1;
+    this.monitorBot = null;
+  }
+
+  setMonitorBot(bot) {
+    this.monitorBot = bot;
   }
 
   async initialize() {
@@ -158,6 +163,16 @@ export class ArgenpropScraper {
   async scanForNewListings(url) {
     this.pageNumber = 1; // Reset page counter
     console.log(`Starting scan...`);
+    
+    // Send status message to monitor chat
+    if (this.monitorBot) {
+      try {
+        await this.monitorBot.sendMessage(`BOT | Alquiler CABA 🟢`);
+      } catch (error) {
+        console.error('Could not send monitor message:', error.message);
+      }
+    }
+    
     try {
       const existingListings = this.loadExistingListings();
       const isFirstRun = existingListings.length === 0;
