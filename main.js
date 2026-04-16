@@ -13,7 +13,7 @@ const SCAN_INTERVAL = parseInt(process.env.SCAN_INTERVAL || '600000', 10); // 10
 const BASE_URL = process.env.BASE_URL || 'https://www.argenprop.com';
 
 // URL to scrape
-const SCRAPE_URL = 'https://www.argenprop.com/departamentos/alquiler/almagro-o-chacarita-o-colegiales-o-palermo-o-villa-crespo/1-dormitorio-o-2-dormitorios/dolares-500-700';
+const SCRAPE_URL = 'https://www.argenprop.com/departamentos/alquiler/almagro-o-chacarita-o-colegiales-o-palermo-o-villa-crespo/dolares-400-600';
 
 let scraper;
 let telegramBot;
