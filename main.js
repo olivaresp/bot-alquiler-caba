@@ -20,6 +20,8 @@ let telegramBot;
 let monitorBot;
 let scheduler;
 
+const SCAN_MODE = process.argv.includes('--scan');
+
 async function main() {
   try {
     // Validate environment variables
@@ -29,17 +31,25 @@ async function main() {
       process.exit(1);
     }
 
-    console.log('Initializing: BOT | Alquiler CABA');
-    console.log(`Scan Interval: ${SCAN_INTERVAL / 1000} seconds`);
-    console.log('');
-
     // Initialize scraper
     scraper = new ArgenpropScraper(BASE_URL);
     await scraper.initialize();
 
+    if (SCAN_MODE) {
+      console.log('Scan mode: loading initial listings without notifications...');
+      const result = await scraper.scanForNewListings(SCRAPE_URL);
+      console.log(`✅ Done. ${result.totalScraped} listings stored. Ready to run npm start.`);
+      await scraper.close();
+      process.exit(0);
+    }
+
+    console.log('Initializing: BOT | Alquiler CABA');
+    console.log(`Scan Interval: ${SCAN_INTERVAL / 1000} seconds`);
+    console.log('');
+
     // Initialize Telegram bot
     telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID);
-    
+
     // Initialize Monitor bot for status messages
     monitorBot = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_MONITOR_CHAT_ID);
     scraper.setMonitorBot(monitorBot);

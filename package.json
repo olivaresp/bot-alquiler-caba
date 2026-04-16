@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node main.js",
+    "scan": "node main.js --scan",
     "dev": "node --watch main.js"
   },
   "dependencies": {
